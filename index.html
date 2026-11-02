@@ -66,10 +66,19 @@ function drawTrackedHighlight(b){
   // カーソル寸法も口幅基準。顔の距離に合わせて等比で変化する。
   const mouthPxW=b.w*r.width;
   const isBackTeeth=(index===0||index===2||index===3||index===5);
-  const rx=clamp(mouthPxW*(isBackTeeth?.22:.20),22,r.width*.075);
-  const ry=clamp(mouthPxW*(isBackTeeth?.17:.12),16,r.height*.075);
+  const isSide=(index===0||index===2||index===3||index===5||index===6||index===8);
+  const isCenter=(index===1||index===4||index===7);
+  // 左右項目は中心位置を外へ動かさず、楕円だけ対象方向へ伸ばす。
+  // これにより子どもの口でも頬側への飛び出しを抑えながら奥歯まで覆う。
+  let rx=clamp(mouthPxW*(isBackTeeth?.27:isSide?.25:.24),24,r.width*.085);
+  let ry=clamp(mouthPxW*(isBackTeeth?.17:isCenter?.14:.13),17,r.height*.075);
+  let drawX=x;
+  if(isSide){
+    const outward=(index===0||index===5||index===6)?-1:1;
+    drawX=x+outward*rx*.18;
+  }
   const color=s[3];
-  tctx.globalAlpha=.32;tctx.fillStyle=color;tctx.beginPath();tctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);tctx.fill();tctx.globalAlpha=1;tctx.lineWidth=6;tctx.strokeStyle=color;tctx.stroke();
+  tctx.globalAlpha=.32;tctx.fillStyle=color;tctx.beginPath();tctx.ellipse(drawX,y,rx,ry,0,0,Math.PI*2);tctx.fill();tctx.globalAlpha=1;tctx.lineWidth=6;tctx.strokeStyle=color;tctx.stroke();
 }
 
 function trackLoop(){if(!tracking)return;const v=$('#video');try{if(faceLandmarker&&v.readyState>=2&&v.currentTime!==lastVideoTime){lastVideoTime=v.currentTime;const res=faceLandmarker.detectForVideo(v,performance.now());if(res.faceLandmarks&&res.faceLandmarks.length){drawTrackedHighlight(smoothBox(mouthBounds(res.faceLandmarks[0])));if(index<10&&next.disabled)hint.textContent='10びょう みがこう'}else{mouthBox=null;tctx.clearRect(0,0,trackCanvas.width,trackCanvas.height);if(index<9)hint.textContent='くちを うつしてね'}}}catch(e){console.error(e)}requestAnimationFrame(trackLoop)}
