@@ -70,20 +70,26 @@ function drawTrackedHighlight(b){
   const isCenter=(index===1||index===4||index===7);
   // 左右項目は中心位置を外へ動かさず、楕円だけ対象方向へ伸ばす。
   // これにより子どもの口でも頬側への飛び出しを抑えながら奥歯まで覆う。
-  // .mirror 全体を2倍ズームするため、描画値はズーム後の見た目を基準に調整。
-  // 従来よりハイライト面積は少し大きくする。
-  // 2倍ズーム画面でも十分な大きさになるよう、前版の2倍以上へ拡大。
-  let rx=clamp(mouthPxW*(isBackTeeth?.32:isSide?.30:.285),28,r.width*.105);
-  let ry=clamp(mouthPxW*(isBackTeeth?.20:isCenter?.175:.16),21,r.height*.092);
-  let drawX=x;
+  // 2倍ズームに対して十分見えるよう、ハイライトを大幅に拡大。
+  // 元版の約2倍の描画半径を使い、ズーム後も歯列を広く覆う。
+  let rx=clamp(mouthPxW*(isBackTeeth?.54:isSide?.50:.48),48,r.width*.17);
+  let ry=clamp(mouthPxW*(isBackTeeth?.34:isCenter?.28:.26),34,r.height*.15);
+  let drawX=x,drawY=y,angle=0;
   if(isSide){
-    // 左右項目はハイライト中心も口の左右側へ寄せる。
-    // ミラー表示後の見え方に合わせ、みぎは画面左、ひだりは画面右へ移動。
     const outward=(index===0||index===5||index===6)?-1:1;
-    drawX=x+outward*mouthPxW*.11;
+    // 左右は口の中心ではなく、それぞれの歯列側へ寄せる。
+    drawX=x+outward*mouthPxW*.13;
+  }
+  if(isBackTeeth){
+    // 「あー」の上左右・下左右は奥歯列の方向に斜めに広げる。
+    const outward=(index===0||index===5)?-1:1;
+    const vertical=(index===0||index===2)?-1:1;
+    drawX+=outward*mouthPxW*.055;
+    drawY+=vertical*mouthPxW*.03;
+    angle=outward*vertical*.30;
   }
   const color=s[3];
-  tctx.globalAlpha=.32;tctx.fillStyle=color;tctx.beginPath();tctx.ellipse(drawX,y,rx,ry,0,0,Math.PI*2);tctx.fill();tctx.globalAlpha=1;tctx.lineWidth=4;tctx.strokeStyle=color;tctx.stroke();
+  tctx.globalAlpha=.32;tctx.fillStyle=color;tctx.beginPath();tctx.ellipse(drawX,drawY,rx,ry,angle,0,Math.PI*2);tctx.fill();tctx.globalAlpha=1;tctx.lineWidth=4;tctx.strokeStyle=color;tctx.stroke();
 }
 
 function trackLoop(){if(!tracking)return;const v=$('#video');try{if(faceLandmarker&&v.readyState>=2&&v.currentTime!==lastVideoTime){lastVideoTime=v.currentTime;const res=faceLandmarker.detectForVideo(v,performance.now());if(res.faceLandmarks&&res.faceLandmarks.length){drawTrackedHighlight(smoothBox(mouthBounds(res.faceLandmarks[0])));if(index<10&&next.disabled)hint.textContent='10びょう みがこう'}else{mouthBox=null;tctx.clearRect(0,0,trackCanvas.width,trackCanvas.height);if(index<9)hint.textContent='くちを うつしてね'}}}catch(e){console.error(e)}requestAnimationFrame(trackLoop)}
