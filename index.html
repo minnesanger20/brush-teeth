@@ -22,42 +22,56 @@ async function loadFaceTracking(){
   }catch(e){ console.error(e); hint.textContent='ついじゅうを よみこめません'; }
 }
 function mouthBounds(lm){
-  const ids=[0,13,14,17,57,61,78,82,87,88,91,95,146,178,181,185,191,267,269,270,291,308,311,312,314,317,318,321,324,375,402,405,409,415];
+  // MediaPipe Face Landmarker の外唇ランドマークから口の左右端・上下端を取得。
+  const ids=[0,17,37,39,40,61,84,91,181,185,191,267,269,270,291,314,321,375,405,409,415];
   let minX=1,minY=1,maxX=0,maxY=0;
-  for(const i of ids){const p=lm[i]; if(!p)continue;minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y)}
-  return {x:minX,y:minY,w:maxX-minX,h:maxY-minY};
+  for(const i of ids){const p=lm[i];if(!p)continue;minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y)}
+  return {x:minX,y:minY,w:Math.max(.001,maxX-minX),h:Math.max(.001,maxY-minY)};
 }
-function smoothBox(b){if(!mouthBox){mouthBox=b;return b}const a=.3;for(const k of ['x','y','w','h'])mouthBox[k]=mouthBox[k]*(1-a)+b[k]*a;return mouthBox}
+function smoothBox(b){
+  if(!mouthBox){mouthBox={...b};return mouthBox}
+  // 小さな揺れは強く抑え、大きな顔移動には追従する適応型EMA。
+  const oldCx=mouthBox.x+mouthBox.w/2,oldCy=mouthBox.y+mouthBox.h/2;
+  const newCx=b.x+b.w/2,newCy=b.y+b.h/2;
+  const movement=Math.hypot(newCx-oldCx,newCy-oldCy);
+  const a=movement>.018?.38:movement>.007?.25:.14;
+  for(const k of ['x','y','w','h'])mouthBox[k]=mouthBox[k]*(1-a)+b[k]*a;
+  return mouthBox;
+}
+function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
 function drawTrackedHighlight(b){
-  const r=trackCanvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);if(trackCanvas.width!==Math.round(r.width*d)||trackCanvas.height!==Math.round(r.height*d)){trackCanvas.width=Math.round(r.width*d);trackCanvas.height=Math.round(r.height*d)}
+  const r=trackCanvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);
+  if(trackCanvas.width!==Math.round(r.width*d)||trackCanvas.height!==Math.round(r.height*d)){trackCanvas.width=Math.round(r.width*d);trackCanvas.height=Math.round(r.height*d)}
   tctx.setTransform(d,0,0,d,0,0);tctx.clearRect(0,0,r.width,r.height);if(index>=9)return;
   const s=steps[index];
-  // 口の開閉でハイライトの大きさが変わらないよう、中心位置だけ追従する。
-  // mouthBounds の幅・高さは描画サイズや左右上下のオフセット計算には使用しない。
-  const sourceX=b.x+b.w/2, cy=b.y+b.h/2;
-  // イラストと対応した9か所の固定オフセット（口中心を基準）。
-  // 左右は画面上の見え方（ミラー表示）に合わせる。
+  const left=b.x, right=b.x+b.w, top=b.y, bottom=b.y+b.h;
+  const cx=(left+right)/2, cy=(top+bottom)/2;
+
+  // 口の幅・高さに対する正規化座標。固定画面ピクセルの移動量は使わない。
+  // canvas全体がミラー表示されるため、配列の左右は画面上の見え方に合わせている。
   const POS=[
-    // 上の歯: 鼻側へ上がりすぎないよう、口中心の少し上だけに配置
-    [-.087,-.032],[0,-.032],[.087,-.032],
-    // 下の歯: あご側へ下がりすぎないよう、口中心の少し下だけに配置
-    [.087,.034],[0,.034],[-.087,.034],
-    // 「いー」: これまでどおり口中央の高さ
-    [-.087,0],[0,0],[.087,0]
+    [.25,.30],[.50,.30],[.75,.30], // 上: みぎ・まえ・ひだり
+    [.75,.70],[.50,.70],[.25,.70], // 下: ひだり・まえ・みぎ
+    [.25,.50],[.50,.50],[.75,.50]  // いー: みぎ・まえ・ひだり
   ];
-  const p=POS[index]||[0,0];
-  const x=sourceX*r.width+p[0]*r.width;
-  const y=cy*r.height+p[1]*r.height;
-  // 常に同じ大きさ。口を大きく開けても縦長に拡大しない。
-  const rx=Math.max(32,Math.min(54,r.width*.049));
-  // 上下の左右（奥歯）は縦方向だけ少し広げ、奥歯全体を覆いやすくする。
+  const p=POS[index]||[.5,.5];
+  let nx=left+b.w*p[0], ny=top+b.h*p[1];
+
+  // 子どもの小さい口でも頬・鼻・あご側へ飛び出さないよう、中心を口領域内に制限。
+  const insetX=b.w*.10,insetY=b.h*.10;
+  nx=clamp(nx,left+insetX,right-insetX);
+  ny=clamp(ny,top+insetY,bottom-insetY);
+  const x=nx*r.width,y=ny*r.height;
+
+  // カーソル寸法も口幅基準。顔の距離に合わせて等比で変化する。
+  const mouthPxW=b.w*r.width;
   const isBackTeeth=(index===0||index===2||index===3||index===5);
-  const ry=isBackTeeth
-    ? Math.max(24,Math.min(40,r.height*.049))
-    : Math.max(19,Math.min(32,r.height*.039));
+  const rx=clamp(mouthPxW*(isBackTeeth?.22:.20),22,r.width*.075);
+  const ry=clamp(mouthPxW*(isBackTeeth?.17:.12),16,r.height*.075);
   const color=s[3];
   tctx.globalAlpha=.32;tctx.fillStyle=color;tctx.beginPath();tctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);tctx.fill();tctx.globalAlpha=1;tctx.lineWidth=6;tctx.strokeStyle=color;tctx.stroke();
 }
+
 function trackLoop(){if(!tracking)return;const v=$('#video');try{if(faceLandmarker&&v.readyState>=2&&v.currentTime!==lastVideoTime){lastVideoTime=v.currentTime;const res=faceLandmarker.detectForVideo(v,performance.now());if(res.faceLandmarks&&res.faceLandmarks.length){drawTrackedHighlight(smoothBox(mouthBounds(res.faceLandmarks[0])));if(index<10&&next.disabled)hint.textContent='10びょう みがこう'}else{mouthBox=null;tctx.clearRect(0,0,trackCanvas.width,trackCanvas.height);if(index<9)hint.textContent='くちを うつしてね'}}}catch(e){console.error(e)}requestAnimationFrame(trackLoop)}
 $('#startBtn').addEventListener('click',async()=>{try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});$('#video').srcObject=stream;await $('#video').play();$('#start').classList.add('hidden');render();loadFaceTracking()}catch(e){alert('カメラを きょかしてね')}});
 </script></body></html>
