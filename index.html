@@ -86,7 +86,10 @@ function drawTrackedHighlight(b){
     const vertical=(index===0||index===2)?-1:1;
     drawX+=outward*mouthPxW*.055;
     drawY+=vertical*mouthPxW*.03;
-    angle=outward*vertical*.30;
+    // 下の左は左斜め上、下の右は右斜め上へ向ける。上側は従来方向を維持。
+    if(index===3) angle=-.48;       // したの ひだり: 左斜め上方向
+    else if(index===5) angle=.48;   // したの みぎ: 右斜め上方向
+    else angle=outward*vertical*.30;
   }
   const color=s[3];
   tctx.globalAlpha=.32;tctx.fillStyle=color;tctx.beginPath();tctx.ellipse(drawX,drawY,rx,ry,angle,0,Math.PI*2);tctx.fill();tctx.globalAlpha=1;tctx.lineWidth=4;tctx.strokeStyle=color;tctx.stroke();
