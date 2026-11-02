@@ -72,12 +72,15 @@ function drawTrackedHighlight(b){
   // これにより子どもの口でも頬側への飛び出しを抑えながら奥歯まで覆う。
   // .mirror 全体を2倍ズームするため、描画値はズーム後の見た目を基準に調整。
   // 従来よりハイライト面積は少し大きくする。
-  let rx=clamp(mouthPxW*(isBackTeeth?.145:isSide?.135:.13),13,r.width*.047);
-  let ry=clamp(mouthPxW*(isBackTeeth?.092:isCenter?.078:.072),10,r.height*.042);
+  // 2倍ズーム画面でも十分な大きさになるよう、前版の2倍以上へ拡大。
+  let rx=clamp(mouthPxW*(isBackTeeth?.32:isSide?.30:.285),28,r.width*.105);
+  let ry=clamp(mouthPxW*(isBackTeeth?.20:isCenter?.175:.16),21,r.height*.092);
   let drawX=x;
   if(isSide){
+    // 左右項目はハイライト中心も口の左右側へ寄せる。
+    // ミラー表示後の見え方に合わせ、みぎは画面左、ひだりは画面右へ移動。
     const outward=(index===0||index===5||index===6)?-1:1;
-    drawX=x+outward*rx*.18;
+    drawX=x+outward*mouthPxW*.11;
   }
   const color=s[3];
   tctx.globalAlpha=.32;tctx.fillStyle=color;tctx.beginPath();tctx.ellipse(drawX,y,rx,ry,0,0,Math.PI*2);tctx.fill();tctx.globalAlpha=1;tctx.lineWidth=4;tctx.strokeStyle=color;tctx.stroke();
