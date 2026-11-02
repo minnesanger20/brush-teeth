@@ -16,7 +16,7 @@ async function loadFaceTracking(){
   try{
     hint.textContent='ついじゅんを よみこみちゅう';
     const vision=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs');
-    const fileset=await vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm');
+    const fileset=await vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm');
     faceLandmarker=await vision.FaceLandmarker.createFromOptions(fileset,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'},runningMode:'VIDEO',numFaces:1,minFaceDetectionConfidence:.35,minFacePresenceConfidence:.35,minTrackingConfidence:.35});
     tracking=true; hint.textContent='くちを うつしてね'; requestAnimationFrame(trackLoop);
   }catch(e){ console.error(e); hint.textContent='ついじゅうを よみこめません'; }
@@ -31,14 +31,14 @@ function smoothBox(b){if(!mouthBox){mouthBox=b;return b}const a=.3;for(const k o
 function drawTrackedHighlight(b){
   const r=trackCanvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);if(trackCanvas.width!==Math.round(r.width*d)||trackCanvas.height!==Math.round(r.height*d)){trackCanvas.width=Math.round(r.width*d);trackCanvas.height=Math.round(r.height*d)}
   tctx.setTransform(d,0,0,d,0,0);tctx.clearRect(0,0,r.width,r.height);if(index>=9)return;
-  const s=steps[index],mirrorX=1-(b.x+b.w/2), cy=b.y+b.h/2;
-  let dx=0,dy=0,rx=Math.max(32,b.w*r.width*.9),ry=Math.max(22,b.h*r.height*1.6);
-  if(index===0||index===5||index===6)dx=-b.w*r.width*.75;
-  if(index===2||index===3||index===8)dx=b.w*r.width*.75;
-  if(index<=2)dy=-b.h*r.height*.7;
-  if(index>=3&&index<=5)dy=b.h*r.height*.7;
-  if(index>=6){rx=Math.max(34,b.w*r.width*.75);ry=Math.max(28,b.h*r.height*2.0)}
-  const x=mirrorX*r.width+dx,y=cy*r.height+dy,color=s[3];
+  const s=steps[index],sourceX=(b.x+b.w/2), cy=b.y+b.h/2;
+  let dx=0,dy=0,rx=Math.max(26,b.w*r.width*.55),ry=Math.max(16,b.h*r.height*.9);
+  if(index===0||index===5||index===6)dx=-b.w*r.width*.42;
+  if(index===2||index===3||index===8)dx=b.w*r.width*.42;
+  if(index<=2)dy=-b.h*r.height*.42;
+  if(index>=3&&index<=5)dy=b.h*r.height*.42;
+  if(index>=6){rx=Math.max(30,b.w*r.width*.46);ry=Math.max(22,b.h*r.height*1.15)}
+  const x=sourceX*r.width+dx,y=cy*r.height+dy,color=s[3];
   tctx.globalAlpha=.32;tctx.fillStyle=color;tctx.beginPath();tctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);tctx.fill();tctx.globalAlpha=1;tctx.lineWidth=6;tctx.strokeStyle=color;tctx.stroke();
 }
 function trackLoop(){if(!tracking)return;const v=$('#video');try{if(faceLandmarker&&v.readyState>=2&&v.currentTime!==lastVideoTime){lastVideoTime=v.currentTime;const res=faceLandmarker.detectForVideo(v,performance.now());if(res.faceLandmarks&&res.faceLandmarks.length){drawTrackedHighlight(smoothBox(mouthBounds(res.faceLandmarks[0])));if(index<10&&next.disabled)hint.textContent='10びょう みがこう'}else{mouthBox=null;tctx.clearRect(0,0,trackCanvas.width,trackCanvas.height);if(index<9)hint.textContent='くちを うつしてね'}}}catch(e){console.error(e)}requestAnimationFrame(trackLoop)}
