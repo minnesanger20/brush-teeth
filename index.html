@@ -50,7 +50,11 @@ function drawTrackedHighlight(b){
   const y=cy*r.height+p[1]*r.height;
   // 常に同じ大きさ。口を大きく開けても縦長に拡大しない。
   const rx=Math.max(32,Math.min(54,r.width*.049));
-  const ry=Math.max(19,Math.min(32,r.height*.039));
+  // 上下の左右（奥歯）は縦方向だけ少し広げ、奥歯全体を覆いやすくする。
+  const isBackTeeth=(index===0||index===2||index===3||index===5);
+  const ry=isBackTeeth
+    ? Math.max(24,Math.min(40,r.height*.049))
+    : Math.max(19,Math.min(32,r.height*.039));
   const color=s[3];
   tctx.globalAlpha=.32;tctx.fillStyle=color;tctx.beginPath();tctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);tctx.fill();tctx.globalAlpha=1;tctx.lineWidth=6;tctx.strokeStyle=color;tctx.stroke();
 }
